@@ -1,9 +1,7 @@
-const fs = require("fs/promises");
-const path = require("path");
-const Generator = require("id-generator");
+const mongoose = require("mongoose");
 const Joi = require("joi");
 
-const schema = Joi.object({
+const contactValidateSchema = Joi.object({
   name: Joi.string().alphanum().min(3).max(30).required(),
   email: Joi.string()
     .email({
@@ -12,64 +10,58 @@ const schema = Joi.object({
     })
     .required(),
   phone: Joi.number().required(),
+  favorite: Joi.boolean(),
 });
 
-const contactsPath = path.join(__dirname, "./contacts.json");
+const contactsSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: [true, "Set name for contact"],
+  },
+  email: {
+    type: String,
+  },
+  phone: {
+    type: String,
+  },
+  favorite: {
+    type: Boolean,
+    default: false,
+  },
+});
+
+const Contacts = mongoose.model("contacts", contactsSchema);
 
 const listContacts = async () => {
-  const data = await fs.readFile(contactsPath, "utf8");
-  return JSON.parse(data);
+  return Contacts.find({});
 };
 
 const getContactById = async (contactId) => {
-  const data = await fs.readFile(contactsPath, "utf8");
-  const contacts = JSON.parse(data);
-  return contacts.find((contact) => contact.id === contactId);
+  return Contacts.findById(contactId);
 };
 
 const addContact = async (body) => {
-  const data = await fs.readFile(contactsPath, "utf8");
-  const contacts = JSON.parse(data);
-  const contact = {
-    id: new Generator().newId(),
-    ...body,
-  };
-  contacts.push(contact);
-  await fs.writeFile(contactsPath, JSON.stringify(contacts), "utf8");
-  return contact;
+  return Contacts.create(body);
 };
 
 const removeContact = async (contactId) => {
-  const data = await fs.readFile(contactsPath, "utf8");
-  const contacts = JSON.parse(data).filter(
-    (contact) => contact.id !== contactId
-  );
-  await fs.writeFile(contactsPath, JSON.stringify(contacts), "utf8");
-  return true;
+  return Contacts.findByIdAndDelete(contactId);
 };
 
 const updateContact = async (contactId, body) => {
-  const data = await fs.readFile(contactsPath, "utf8");
-  let updatedContact = {};
-  const contacts = JSON.parse(data).map((contact) => {
-    if (contactId === contact.id) {
-      updatedContact = {
-        ...contact,
-        ...body,
-      };
-      return updatedContact;
-    }
-    return contact;
-  });
-  await fs.writeFile(contactsPath, JSON.stringify(contacts), "utf8");
-  return updatedContact;
+  return Contacts.findByIdAndUpdate(contactId, body);
+};
+
+const updateStatusContact = async (contactId, body) => {
+  return Contacts.findByIdAndUpdate(contactId, body);
 };
 
 module.exports = {
-  schema,
   listContacts,
   getContactById,
-  removeContact,
   addContact,
+  removeContact,
   updateContact,
+  updateStatusContact,
+  contactValidateSchema,
 };
