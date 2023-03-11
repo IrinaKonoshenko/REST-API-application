@@ -11,9 +11,7 @@ const params = {
 };
 passport.use(
   new Strategy(params, async (payload, done) => {
-    console.log(2222222222);
     try {
-      console.log(payload);
       const user = await Users.findById(payload.id);
 
       if (!user) {
@@ -24,7 +22,6 @@ passport.use(
       }
       return done(null, user);
     } catch (err) {
-      console.log("asdasd");
       return done(err, false);
     }
   })

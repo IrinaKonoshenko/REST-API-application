@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
+const gravatar = require("gravatar");
 
 const usersSchema = new mongoose.Schema({
   password: {
@@ -20,6 +21,9 @@ const usersSchema = new mongoose.Schema({
     type: String,
     default: null,
   },
+  avatarURL: {
+    type: String,
+  },
 });
 
 usersSchema.pre("save", async function (next) {
@@ -27,7 +31,7 @@ usersSchema.pre("save", async function (next) {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
   }
-
+  this.avatarURL = gravatar.url(this.email);
   next();
 });
 
