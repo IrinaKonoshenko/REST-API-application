@@ -1,8 +1,13 @@
 const jwt = require("jsonwebtoken");
+const fs = require("fs").promises;
+const { randomUUID } = require("crypto");
 
 const Joi = require("joi");
 const Users = require("../models/users");
 const SECRET_KEY = require("../config/passport");
+const path = require("path");
+const { storeImage } = require("../config/multer");
+const Jimp = require("jimp");
 
 const usersValidateSchema = Joi.object({
   email: Joi.string()
@@ -64,12 +69,38 @@ const logout = async (req, res, next) => {
 
 const current = async (req, res, next) => {
   const token = req.get("Authorization")?.split(" ")[1];
-
   const user = await Users.findOne({ token });
 
-  return res
-    .status(200)
-    .json({ email: user.email, subscription: user.subscription });
+  return res.status(200).json({
+    email: user.email,
+    subscription: user.subscription,
+    avatarURL: user.avatarURL,
+  });
+};
+
+const avatars = async (req, res, next) => {
+  const { path: temporaryName, originalname } = req.file;
+
+  const extension = originalname.split(".").pop();
+  const fileName = randomUUID() + "." + extension;
+  const avatarURL = "/avatars/" + fileName;
+  const filePath = path.join(storeImage, fileName);
+
+  try {
+    const file = await Jimp.read(temporaryName);
+    await file.resize(250, 250).writeAsync(temporaryName);
+    await fs.rename(temporaryName, filePath);
+  } catch (err) {
+    await fs.unlink(temporaryName);
+    return next(err);
+  }
+
+  const token = req.get("Authorization")?.split(" ")[1];
+  const user = await Users.findOne({ token });
+
+  await Users.findByIdAndUpdate(user._id, { avatarURL });
+
+  return res.status(200).json({ avatarURL });
 };
 
 module.exports = {
@@ -77,4 +108,5 @@ module.exports = {
   login,
   logout,
   current,
+  avatars,
 };
