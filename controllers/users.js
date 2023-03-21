@@ -9,6 +9,12 @@ const path = require("path");
 const { storeImage } = require("../config/multer");
 const Jimp = require("jimp");
 
+const sgMail = require("@sendgrid/mail");
+const { v4: uuidv4 } = require("uuid");
+
+const { SENDGRID_API_KEY } = process.env;
+sgMail.setApiKey(SENDGRID_API_KEY);
+
 const usersValidateSchema = Joi.object({
   email: Joi.string()
     .email({
@@ -30,7 +36,21 @@ async function signup(req, res, next) {
   if (user) {
     return res.status(409).json({ message: "Email in use" });
   }
-  const newUser = await Users.create(body);
+
+  const verificationToken = uuidv4();
+  const newUser = await Users.create({
+    ...body,
+    verificationToken,
+  });
+
+  sgMail.send({
+    to: body.email,
+    from: "support@irinakonoshenko.github.io",
+    subject: "Veretification your account",
+    text: "complete veretify",
+    html: `<a href="/api/users/verify/${verificationToken}">Veretify</a>`,
+  });
+
   return res.status(201).json({ data: newUser });
 }
 
@@ -46,6 +66,10 @@ async function login(req, res, next) {
 
   if (!user || !isPasswordValid) {
     return res.status(401).json({ message: "Email or password is wrong" });
+  }
+
+  if (!user.verify) {
+    return res.status(401).json({ message: "Veritify your email" });
   }
 
   const token = jwt.sign({ id: user._id }, SECRET_KEY, { expiresIn: "1h" });
@@ -103,10 +127,55 @@ const avatars = async (req, res, next) => {
   return res.status(200).json({ avatarURL });
 };
 
+const verification = async (req, res, next) => {
+  const verificationToken = req.params.verificationToken;
+
+  const user = await Users.findOneAndUpdate(
+    { verificationToken },
+    {
+      verificationToken: null,
+      verify: true,
+    }
+  );
+
+  if (user) {
+    return res.status(200).json({ message: "Verification successful" });
+  }
+
+  return res.status(404).json({ message: "User not found" });
+};
+
+const resendEmail = async (req, res, next) => {
+  const body = req.body;
+
+  if (!body.email) {
+    return res.status(400).json({ message: "missing required field email" });
+  }
+
+  const user = Users.findOne({ email });
+  if (user.verify) {
+    return res
+      .status(400)
+      .json({ message: "Verification has already been passed" });
+  }
+
+  sgMail.send({
+    to: user.email,
+    from: "support@irinakonoshenko.github.io",
+    subject: "Veretification your account",
+    text: "complete veretify",
+    html: `<a href="/api/users/verify/${user.verificationToken}">Veretify</a>`,
+  });
+
+  return res.status(200).json({ message: "Verification email sent" });
+};
+
 module.exports = {
   signup,
   login,
   logout,
   current,
   avatars,
+  verification,
+  resendEmail,
 };

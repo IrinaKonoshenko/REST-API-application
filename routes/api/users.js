@@ -7,6 +7,8 @@ const {
   logout,
   signup,
   avatars,
+  verification,
+  resendEmail,
 } = require("../../controllers/users.js");
 const guard = require("../../middleware/guard");
 
@@ -19,5 +21,9 @@ router.get("/logout", guard, logout);
 router.get("/current", guard, current);
 
 router.patch("/avatars", guard, upload.single("avatars"), avatars);
+
+router.get("/verify/:verificationToken", verification);
+
+router.post("/verify/", resendEmail);
 
 module.exports = router;
